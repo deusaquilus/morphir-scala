@@ -87,6 +87,16 @@ abstract class MorphirJsonBaseSpec extends MorphirBaseSpec {
     ) // comparing primitive types and manage numbers (100.00 == 100)
   )
 
+  def doJsonDiff(expectedJson: String, actualJson: String) = {
+    val jsondiff     = DiffGenerator.diff(expectedJson, actualJson, jsonMatcher)
+    val errorsResult = OnlyErrorDiffViewer.from(jsondiff)
+    // create a patch file text
+    var patch = PatchDiffViewer.from(jsondiff);
+    // use the viewer to collect diff data
+    var patchFile = PatchDiffViewer.from(jsondiff);
+    (errorsResult.toString, patchFile.toString)
+  }
+
   private def validateTest[A: JsonEncoder](
       resourceDir: Path,
       name: String,
