@@ -141,7 +141,13 @@ abstract class MorphirJsonBaseSpec extends MorphirBaseSpec {
                    |""".stripMargin
              )
            } else {
-             Console.printLine("")
+             Console.printLine(
+               s"""|==================== Golden Json Change ====================
+                   |${patchFilePath}
+                   |==================== Description ==================
+                   |${errors}
+                   |""".stripMargin
+             )
            }) *>
             writeSampleToFile(diffFilePath, sample) *>
             ZIO.succeed(assertTrue(sample == currentSample))
