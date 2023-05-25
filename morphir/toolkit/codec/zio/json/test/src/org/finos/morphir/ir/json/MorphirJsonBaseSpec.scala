@@ -132,7 +132,10 @@ abstract class MorphirJsonBaseSpec extends MorphirBaseSpec {
           object CompareMini {
             import scala.collection.immutable
             sealed trait Diff
-            object Diff {}
+            object Diff {
+              case class MissingRight(leftValue: Any) extends Diff
+              case class MissingLeft(rightValue: Any) extends Diff
+            }
           }
 
           (if (structureDiff.length <= 20) {
