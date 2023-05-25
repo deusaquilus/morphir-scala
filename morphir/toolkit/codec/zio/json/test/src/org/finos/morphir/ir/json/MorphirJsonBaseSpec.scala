@@ -129,7 +129,11 @@ abstract class MorphirJsonBaseSpec extends MorphirBaseSpec {
           val currentSampleJson   = currentSample.toJsonPretty
           val (errors, patchFile) = doJsonDiff(sampleJson, currentSampleJson)
 
-          object CompareMini {}
+          object CompareMini {
+            import scala.collection.immutable
+            sealed trait Diff
+            object Diff {}
+          }
 
           (if (structureDiff.length <= 20) {
              Console.printLine(
