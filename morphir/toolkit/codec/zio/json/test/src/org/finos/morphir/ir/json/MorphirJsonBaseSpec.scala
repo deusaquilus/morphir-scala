@@ -97,6 +97,14 @@ abstract class MorphirJsonBaseSpec extends MorphirBaseSpec {
     (errorsResult.toString, patchFile.toString)
   }
 
+  def writeContentToFile(path: Path, content: String)(implicit trace: Trace): IO[IOException, Unit] = {
+    val jsonString = content
+
+    ZIO.attemptBlockingIO {
+      Files.write(path, jsonString.getBytes("UTF-8"))
+    }.unit
+  }
+
   private def validateTest[A: JsonEncoder](
       resourceDir: Path,
       name: String,
