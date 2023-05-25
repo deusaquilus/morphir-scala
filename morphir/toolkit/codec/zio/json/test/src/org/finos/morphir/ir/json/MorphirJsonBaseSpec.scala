@@ -129,6 +129,8 @@ abstract class MorphirJsonBaseSpec extends MorphirBaseSpec {
           val currentSampleJson   = currentSample.toJsonPretty
           val (errors, patchFile) = doJsonDiff(sampleJson, currentSampleJson)
 
+          object CompareMini {}
+
           (if (structureDiff.length <= 20) {
              Console.printLine(
                s"""|==================== Golden Json Change ====================
