@@ -13,6 +13,16 @@ import zio.json._
 import zio.json.ast._
 import java.io.File
 import com.deblock.jsondiff.matcher.CompositeJsonMatcher
+import com.deblock.jsondiff.matcher.LenientJsonArrayPartialMatcher
+import com.deblock.jsondiff.matcher.LenientJsonObjectPartialMatcher
+import com.deblock.jsondiff.matcher.LenientNumberPrimitivePartialMatcher
+import com.deblock.jsondiff.matcher.StrictPrimitivePartialMatcher
+import org.finos.morphir.ir.json.util.Compare
+import com.deblock.jsondiff.DiffGenerator
+import com.deblock.jsondiff.viewer.OnlyErrorDiffViewer
+import com.deblock.jsondiff.viewer.PatchDiffViewer
+import java.io.IOException
+import zio.process.Command
 
 abstract class MorphirJsonBaseSpec extends MorphirBaseSpec {
   implicit private lazy val diffJsonValue: Diff[Json] = {
