@@ -115,7 +115,7 @@ abstract class MorphirJsonBaseSpec extends MorphirBaseSpec {
     val patchFileName       = Paths.get(s"${name}.patch")
     val patchFilePath       = resourceDir.resolve(patchFileName)
     val diffFilePath        = resourceDir.resolve(diffFileName)
-    val structureDiff       = QPrint.Printer(Compare(sample, currentSample))
+    val structureDiff       = "N/A"
     val sampleJson          = sample.toJsonPretty
     val currentSampleJson   = currentSample.toJsonPretty
     val (errors, patchFile) = doJsonDiff(sampleJson, currentSampleJson)
