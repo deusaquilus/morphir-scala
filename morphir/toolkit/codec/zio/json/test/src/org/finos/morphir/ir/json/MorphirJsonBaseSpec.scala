@@ -79,6 +79,14 @@ abstract class MorphirJsonBaseSpec extends MorphirBaseSpec {
     } yield path
   }
 
+  final val jsonMatcher = new CompositeJsonMatcher(
+    new LenientJsonArrayPartialMatcher(),  // comparing array using lenient mode (ignore array order and extra items)
+    new LenientJsonObjectPartialMatcher(), // comparing object using lenient mode (ignoring extra properties)
+    new LenientNumberPrimitivePartialMatcher(
+      new StrictPrimitivePartialMatcher()
+    ) // comparing primitive types and manage numbers (100.00 == 100)
+  )
+
   private def validateTest[A: JsonEncoder](
       resourceDir: Path,
       name: String,
