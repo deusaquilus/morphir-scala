@@ -17,7 +17,6 @@ import com.deblock.jsondiff.matcher.LenientJsonArrayPartialMatcher
 import com.deblock.jsondiff.matcher.LenientJsonObjectPartialMatcher
 import com.deblock.jsondiff.matcher.LenientNumberPrimitivePartialMatcher
 import com.deblock.jsondiff.matcher.StrictPrimitivePartialMatcher
-import org.finos.morphir.ir.json.util.Compare
 import com.deblock.jsondiff.DiffGenerator
 import com.deblock.jsondiff.viewer.OnlyErrorDiffViewer
 import com.deblock.jsondiff.viewer.PatchDiffViewer
@@ -111,14 +110,8 @@ abstract class MorphirJsonBaseSpec extends MorphirBaseSpec {
       gen: Gen[Sized, A],
       sampleSize: Int
   )(implicit trace: Trace): ZIO[Sized, Throwable, TestResult] = {
-    val diffFileName        = Paths.get(s"${name}_changed.json")
-    val patchFileName       = Paths.get(s"${name}.patch")
-    val patchFilePath       = resourceDir.resolve(patchFileName)
-    val diffFilePath        = resourceDir.resolve(diffFileName)
-    val structureDiff       = "N/A"
-    val sampleJson          = sample.toJsonPretty
-    val currentSampleJson   = currentSample.toJsonPretty
-    val (errors, patchFile) = doJsonDiff(sampleJson, currentSampleJson)
+    val fileName = Paths.get(s"$name.json")
+    val filePath = resourceDir.resolve(fileName)
 
     for {
       currentSample <- readSampleFromFile(filePath)
@@ -127,8 +120,14 @@ abstract class MorphirJsonBaseSpec extends MorphirBaseSpec {
         if (sample == currentSample) {
           ZIO.succeed(assertTrue(sample == currentSample))
         } else {
-          val diffFileName = Paths.get(s"${name}_changed.json")
-          val diffFilePath = resourceDir.resolve(diffFileName)
+          val diffFileName        = Paths.get(s"${name}_changed.json")
+          val patchFileName       = Paths.get(s"${name}.patch")
+          val patchFilePath       = resourceDir.resolve(patchFileName)
+          val diffFilePath        = resourceDir.resolve(diffFileName)
+          val structureDiff       = "N/A"
+          val sampleJson          = sample.toJsonPretty
+          val currentSampleJson   = currentSample.toJsonPretty
+          val (errors, patchFile) = doJsonDiff(sampleJson, currentSampleJson)
 
           (if (structureDiff.length <= 20) {
              Console.printLine(
