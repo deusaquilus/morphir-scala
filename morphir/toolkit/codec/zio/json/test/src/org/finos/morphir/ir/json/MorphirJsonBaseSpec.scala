@@ -149,6 +149,26 @@ abstract class MorphirJsonBaseSpec extends MorphirBaseSpec {
                    |""".stripMargin
              )
            }) *>
+            (
+              Command(
+                "git",
+                "diff",
+                "-U5",
+                "--no-index",
+                filePath.toString,
+                diffFilePath.toString
+              ).lines
+                .map { linesChunk =>
+                  linesChunk.map { line =>
+                    line
+                      .replace(diffFilePath.toString, filePath.toString)
+                      .replace(Paths.get("").toAbsolutePath().toString, "")
+                  }
+                }
+                .flatMap { lines =>
+                  writeContentToFile(patchFilePath, lines.mkString("\n") + "\n")
+                }
+            ) *>
             writeSampleToFile(diffFilePath, sample) *>
             ZIO.succeed(assertTrue(sample == currentSample))
         }
