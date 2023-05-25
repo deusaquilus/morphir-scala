@@ -135,6 +135,9 @@ abstract class MorphirJsonBaseSpec extends MorphirBaseSpec {
             object Diff {
               case class MissingRight(leftValue: Any) extends Diff
               case class MissingLeft(rightValue: Any) extends Diff
+
+              case class Object(typename: String, fields: ListMap[String, Diff])   extends Diff
+              case class Sequence(typename: String, fields: ListMap[String, Diff]) extends Diff
             }
           }
 
