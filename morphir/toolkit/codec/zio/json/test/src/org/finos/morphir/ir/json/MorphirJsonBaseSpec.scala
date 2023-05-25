@@ -12,6 +12,7 @@ import zio.json.golden.filehelpers._
 import zio.json._
 import zio.json.ast._
 import java.io.File
+import com.deblock.jsondiff.matcher.CompositeJsonMatcher
 
 abstract class MorphirJsonBaseSpec extends MorphirBaseSpec {
   implicit private lazy val diffJsonValue: Diff[Json] = {
