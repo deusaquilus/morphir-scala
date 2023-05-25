@@ -170,7 +170,8 @@ abstract class MorphirJsonBaseSpec extends MorphirBaseSpec {
                 }
             ) *>
             writeSampleToFile(diffFilePath, sample) *>
-            ZIO.succeed(assertTrue(sample == currentSample))
+            // ZIO.succeed(assertTrue(sample == currentSample))
+            ZIO.succeed(assertTrue(false))
         }
     } yield assertion
   }
