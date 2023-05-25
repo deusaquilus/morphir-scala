@@ -129,7 +129,21 @@ abstract class MorphirJsonBaseSpec extends MorphirBaseSpec {
         } else {
           val diffFileName = Paths.get(s"${name}_changed.json")
           val diffFilePath = resourceDir.resolve(diffFileName)
-          writeSampleToFile(diffFilePath, sample) *>
+
+          (if (structureDiff.length <= 20) {
+             Console.printLine(
+               s"""|==================== Golden Json Change ====================
+                   |${patchFilePath}
+                   |==================== Structure Diff ==================
+                   |${structureDiff}
+                   |==================== Description ==================
+                   |${errors}
+                   |""".stripMargin
+             )
+           } else {
+             Console.printLine("")
+           }) *>
+            writeSampleToFile(diffFilePath, sample) *>
             ZIO.succeed(assertTrue(sample == currentSample))
         }
     } yield assertion
