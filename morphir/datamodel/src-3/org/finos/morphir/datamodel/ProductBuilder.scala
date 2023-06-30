@@ -2,9 +2,9 @@ package org.finos.morphir.datamodel
 
 import scala.reflect.ClassTag
 import scala.reflect.classTag
-import scala.quoted._
-import scala.deriving._
-import scala.compiletime.{erasedValue, constValue, summonFrom, summonInline, error, codeOf}
+import scala.quoted.*
+import scala.deriving.*
+import scala.compiletime.{codeOf, constValue, erasedValue, error, summonFrom, summonInline}
 import org.finos.morphir.datamodel.Data
 import org.finos.morphir.datamodel.Label
 
@@ -69,7 +69,17 @@ private[datamodel] case class SumBuilder(tpe: SumBuilder.SumType, variants: List
           )
       }
 
-    val variantData = usedVariant.deriver.derive(value)
+    val variantData =
+      usedVariant match {
+        case SumBuilder.SingletonVariant(enumLabel, tag) => ???
+        case v: SumBuilder.ProductVariant =>
+          value match {
+            case p: Product => v.deriver.derive(p)
+            case other => throw new IllegalArgumentException(
+                s"The value ($value) for the enum variant ${v.enumLabel} must be a scala product type (case class or multi-field enum) but it was a ${other.getClass}"
+              )
+          }
+      }
 
     val enumValues =
       // TODO what if it's a singleton e.g. a case-object, maybe need another SumBuilder type for that
@@ -87,11 +97,15 @@ private[datamodel] case class SumBuilder(tpe: SumBuilder.SumType, variants: List
           val enumCases =
             variants.map { v =>
               val enumVariantFields =
-                v.deriver.concept match {
-                  case Concept.Record(fields) =>
-                    fields.map { case (label, concept) => Concept.Enum.Case.Field.Named(label, concept) }
-                  case other =>
-                    failInsideNotProduct(other)
+                v match {
+                  case SumBuilder.SingletonVariant(enumLabel, tag) => ???
+                  case pvar: SumBuilder.ProductVariant =>
+                    pvar.deriver.concept match {
+                      case Concept.Record(fields) =>
+                        fields.map { case (label, concept) => Concept.Enum.Case.Field.Named(label, concept) }
+                      case other =>
+                        failInsideNotProduct(other)
+                    }
                 }
               Concept.Enum.Case(Label(v.enumLabel), enumVariantFields)
             }
@@ -102,7 +116,15 @@ private[datamodel] case class SumBuilder(tpe: SumBuilder.SumType, variants: List
   }
 }
 object SumBuilder {
-  case class Variant(enumLabel: java.lang.String, tag: ClassTag[Any], deriver: Deriver[Any])
+  sealed trait Variant {
+    def tag: ClassTag[Any]
+    def enumLabel: java.lang.String
+  }
+  // case object variant of sealed trait
+  case class SingletonVariant(enumLabel: java.lang.String, tag: ClassTag[Any]) extends Variant
+  // case class variant of sealed trait
+  case class ProductVariant(enumLabel: java.lang.String, tag: ClassTag[Any], deriver: GenericProductDeriver[Product])
+      extends Variant
 
   sealed trait SumType
   case class Enum(name: java.lang.String) extends SumType

@@ -76,6 +76,8 @@ object Deriver {
         val fieldName = constValue[field].toString
         inline erasedValue[Elems] match {
           case _: (head *: tail) =>
+            // need to check that 'head' is a product type, the only summon a product deriver for that?
+
             summonDeriver[head] match {
               case deriver: SpecificDeriver[Any]           => ???
               case deriver: GenericProductDeriver[Product] => ???
