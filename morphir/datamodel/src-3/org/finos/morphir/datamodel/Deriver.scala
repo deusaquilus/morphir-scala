@@ -33,8 +33,8 @@ object Deriver {
     Expr(TypeRepr.of[T].simplified.typeSymbol.name)
   }
 
-  type IsProduct[P <: Product]  = P
-  type IsOption[P <: Option[_]] = P
+  type IsProduct[P <: scala.Product] = P
+  type IsOption[P <: Option[_]]      = P
 
   inline def summonDeriver[T]: Deriver[T] = ${ summonDeriverImpl[T] }
   def summonDeriverImpl[T: Type](using Quotes): Expr[Deriver[T]] =
@@ -68,7 +68,26 @@ object Deriver {
         error(s"Cannot find specific deriver for type: ${showType[T]}")
     }
 
-  inline def deriveProductFields[Fields <: Tuple, Elems <: Tuple](i: Int): List[FieldStage] =
+  inline def deriveSumVariants[Fields <: Tuple, Elems <: Tuple](i: Int): List[ProductBuilderField] =
+    inline erasedValue[Fields] match {
+      case EmptyTuple => Nil
+
+      case _: (field *: fields) =>
+        val fieldName = constValue[field].toString
+        inline erasedValue[Elems] match {
+          case _: (head *: tail) =>
+            summonDeriver[head] match {
+              case deriver: SpecificDeriver[Any]           => ???
+              case deriver: GenericProductDeriver[Product] => ???
+              case deriver: GenericSumDeriver[Any]         => ???
+            }
+
+          case EmptyTuple =>
+            error("shuold not be possible")
+        }
+    }
+
+  inline def deriveProductFields[Fields <: Tuple, Elems <: Tuple](i: Int): List[ProductBuilderField] =
     inline erasedValue[Fields] match {
       case EmptyTuple => Nil
 
@@ -79,9 +98,11 @@ object Deriver {
             val derivationStage =
               summonDeriver[head] match {
                 case deriver: SpecificDeriver[Any] =>
-                  Stage.FieldLeaf(fieldName, i, deriver)
+                  ProductBuilder.Leaf(fieldName, i, deriver)
                 case deriver: GenericProductDeriver[Product] =>
-                  Stage.FieldProduct(fieldName, i, deriver)
+                  ProductBuilder.Product(fieldName, i, deriver)
+                case deriver: GenericSumDeriver[Any] =>
+                  ProductBuilder.Sum(fieldName, i, deriver)
               }
             derivationStage +: deriveProductFields[fields, tail](i + 1)
 
@@ -104,32 +125,42 @@ object Deriver {
             error(
               "Cannot summon a generic derivation of Option[T], a specific encoder is required. Have you imported `org.finos.morphir.datamodel.Derviers._` ?"
             )
+
           case m: Mirror.ProductOf[T] =>
             val stageListTuple = deriveProductFields[m.MirroredElemLabels, m.MirroredElemTypes](0)
-            val mirrorProduct  = Stage.MirrorProduct(stageListTuple)
+            val mirrorProduct  = ProductBuilder.MirrorProduct(stageListTuple)
             GenericProductDeriver
               .make[T & Product](mirrorProduct)
               .asInstanceOf[Deriver[T]] // not sure why the cast is needed
+
+          case m: Mirror.SumOf[T] =>
+            m
+            ???
         }
     }
 }
 
 trait GenericProductDeriver[T <: Product] extends Deriver[T] {
-  def derive(value: T): Data = stage.run(value)
-  def stage: Stage.MirrorProduct
-  // def concept: Concept.Record
+  def derive(value: T): Data = builder.run(value)
+  def builder: ProductBuilder.MirrorProduct
 }
+
+trait GenericSumDeriver[T] extends Deriver[T] {
+  def derive(value: T): Data = ??? // stage.rum(value)
+  def builder: SumBuilder    = ???
+}
+
 object GenericProductDeriver {
-  def make[T <: Product](creationStage: Stage.MirrorProduct) =
+  def make[T <: Product](creationStage: ProductBuilder.MirrorProduct) =
     new GenericProductDeriver[T] {
-      val stage = creationStage
+      val builder = creationStage
       val concept: Concept.Record = {
         // Deriver stage contains list of fields and child derivers
         val fields: List[(Label, Concept)] =
           creationStage.fields.map {
-            case Stage.FieldLeaf(field, _, deriver) =>
+            case ProductBuilder.Leaf(field, _, deriver) =>
               (Label(field), deriver.concept)
-            case Stage.FieldProduct(field, _, deriver) =>
+            case ProductBuilder.Product(field, _, deriver) =>
               (Label(field), deriver.concept)
           }
         Concept.Record(fields)
@@ -153,7 +184,7 @@ object GenericProductDeriver {
       inline ev match {
         case m: Mirror.ProductOf[T] =>
           val stageListTuple = Deriver.deriveProductFields[m.MirroredElemLabels, m.MirroredElemTypes](0)
-          val mirrorProduct  = Stage.MirrorProduct(stageListTuple)
+          val mirrorProduct  = ProductBuilder.MirrorProduct(stageListTuple)
           GenericProductDeriver
             .make[T & Product](mirrorProduct)
       }

@@ -120,7 +120,7 @@ object Concept {
    *   )
    * }}}
    */
-  case class Enum(cases: scala.List[Enum.Case]) extends Concept
+  case class Enum(name: java.lang.String, cases: scala.List[Enum.Case]) extends Concept
 
   object Enum {
     case class Case(label: Label, fields: scala.List[Case.Field])
