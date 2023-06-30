@@ -19,7 +19,14 @@ trait SpecificDeriver[T] extends Deriver[T] {
   def concept: Concept
 }
 
+private[datamodel] object DeriverTypes {
+  type IsProduct[P <: scala.Product] = P
+  type IsOption[P <: Option[_]]      = P
+}
+
 object Deriver {
+  import DeriverTypes._
+  import DeriverMacros._
 
   inline def toData[T](value: T): Data = {
     import org.finos.morphir.datamodel.Derivers.{given, _}
@@ -33,34 +40,6 @@ object Deriver {
     Expr(TypeRepr.of[T].simplified.typeSymbol.name)
   }
 
-  type IsProduct[P <: scala.Product] = P
-  type IsOption[P <: Option[_]]      = P
-
-  inline def summonDeriver[T]: Deriver[T] = ${ summonDeriverImpl[T] }
-  def summonDeriverImpl[T: Type](using Quotes): Expr[Deriver[T]] =
-    import quotes.reflect._
-    val specificDriver = Expr.summon[SpecificDeriver[T]]
-    specificDriver match {
-      case Some(value) => value
-      case None =>
-        Type.of[T] match {
-          case '[IsProduct[p]] =>
-            val genericDeriver = Expr.summon[GenericProductDeriver[p]]
-            genericDeriver match {
-              case Some(value) => '{ $value.asInstanceOf[Deriver[T]] }
-              case _ =>
-                report.errorAndAbort(
-                  s"Cannot summon specific or generic Deriver for the type: ${TypeRepr.of[T].widen.show}"
-                )
-            }
-          case _ =>
-            report.errorAndAbort(
-              s"Cannot summon specific Deriver for the type (and it is not a Product): ${TypeRepr.of[T].widen.show}"
-            )
-        }
-
-    }
-
   inline def summonSpecificDeriver[T] =
     summonFrom {
       case deriver: SpecificDeriver[T] => deriver
@@ -68,7 +47,15 @@ object Deriver {
         error(s"Cannot find specific deriver for type: ${showType[T]}")
     }
 
-  inline def deriveSumVariants[Fields <: Tuple, Elems <: Tuple](i: Int): List[ProductBuilderField] =
+  private enum UnionType {
+    case SealedTrait
+    case Enum
+    case Sum
+  }
+
+  private inline def deriveSumVariants[Fields <: Tuple, Elems <: Tuple](
+      unionType: UnionType
+  ): List[SumBuilder.Variant] =
     inline erasedValue[Fields] match {
       case EmptyTuple => Nil
 
@@ -76,13 +63,30 @@ object Deriver {
         val fieldName = constValue[field].toString
         inline erasedValue[Elems] match {
           case _: (head *: tail) =>
-            // need to check that 'head' is a product type, the only summon a product deriver for that?
+            val ct = summonClassTagOrFail[head].asInstanceOf[ClassTag[Any]]
+            val variant =
+              unionType match {
+                case UnionType.Enum =>
+                  // enum case with fields
+                  if (isCaseClass[head]) {
+                    summonProductDeriver[head] match {
+                      case deriver: GenericProductDeriver[Product] =>
+                        SumBuilder.EnumProduct(fieldName, ct, deriver)
+                      case other =>
+                        error("Illegal state, should not be possible")
+                    }
+                  } // enum case without fields
+                  else {
+                    SumBuilder.EnumSingleton(fieldName, ct)
+                  }
+                // for the sum-case just do regular recursive derivation
+                case UnionType.Sum =>
+                  val deriver = summonDeriver[head].asInstanceOf[Deriver[Any]]
+                  SumBuilder.SumVariant(fieldName, ct, deriver)
+              }
 
-            summonDeriver[head] match {
-              case deriver: SpecificDeriver[Any]           => ???
-              case deriver: GenericProductDeriver[Product] => ???
-              case deriver: GenericSumDeriver[Any]         => ???
-            }
+            // return the variant and recurse
+            variant +: deriveSumVariants[fields, tail](unionType)
 
           case EmptyTuple =>
             error("shuold not be possible")

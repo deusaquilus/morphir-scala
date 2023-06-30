@@ -69,25 +69,26 @@ private[datamodel] case class SumBuilder(tpe: SumBuilder.SumType, variants: List
           )
       }
 
-    val variantData =
+    val enumValues =
       usedVariant match {
-        case SumBuilder.SingletonVariant(enumLabel, tag) => ???
-        case v: SumBuilder.ProductVariant =>
+        // for a enum case object, data-type is just a 'unit'
+        case SumBuilder.EnumSingleton(enumLabel, tag) =>
+          List(Data.Unit)
+
+        case v: SumBuilder.EnumProduct =>
           value match {
-            case p: Product => v.deriver.derive(p)
+            case p: Product =>
+              val enumCaseRecord = v.deriver.derive(p)
+              enumCaseRecord match {
+                case Data.Record(values) =>
+                  values.map { (_, data) => data }
+                case other =>
+                  failInsideNotProduct(other)
+              }
             case other => throw new IllegalArgumentException(
                 s"The value ($value) for the enum variant ${v.enumLabel} must be a scala product type (case class or multi-field enum) but it was a ${other.getClass}"
               )
           }
-      }
-
-    val enumValues =
-      // TODO what if it's a singleton e.g. a case-object, maybe need another SumBuilder type for that
-      variantData match {
-        case Data.Record(values) =>
-          values.map { (_, data) => data }
-        case other =>
-          failInsideNotProduct(other)
       }
 
     // TODO what if it's a singleton e.g. a case-object, maybe need another SumBuilder type for that
@@ -98,8 +99,8 @@ private[datamodel] case class SumBuilder(tpe: SumBuilder.SumType, variants: List
             variants.map { v =>
               val enumVariantFields =
                 v match {
-                  case SumBuilder.SingletonVariant(enumLabel, tag) => ???
-                  case pvar: SumBuilder.ProductVariant =>
+                  case SumBuilder.EnumSingleton(enumLabel, tag) => ???
+                  case pvar: SumBuilder.EnumProduct =>
                     pvar.deriver.concept match {
                       case Concept.Record(fields) =>
                         fields.map { case (label, concept) => Concept.Enum.Case.Field.Named(label, concept) }
@@ -120,11 +121,16 @@ object SumBuilder {
     def tag: ClassTag[Any]
     def enumLabel: java.lang.String
   }
-  // case object variant of sealed trait
-  case class SingletonVariant(enumLabel: java.lang.String, tag: ClassTag[Any]) extends Variant
-  // case class variant of sealed trait
-  case class ProductVariant(enumLabel: java.lang.String, tag: ClassTag[Any], deriver: GenericProductDeriver[Product])
-      extends Variant
+  sealed trait EnumVariant extends Variant
+  // case object variant of a sealed trait or a enum case with no fields
+  case class EnumSingleton(enumLabel: java.lang.String, tag: ClassTag[Any])
+      extends EnumVariant
+  // case class variant of sealed trait or enum case with fields
+  case class EnumProduct(enumLabel: java.lang.String, tag: ClassTag[Any], deriver: GenericProductDeriver[Product])
+      extends EnumVariant
+
+  // for generic sums
+  case class SumVariant(enumLabel: java.lang.String, tag: ClassTag[Any], deriver: Deriver[Any]) extends Variant
 
   sealed trait SumType
   case class Enum(name: java.lang.String) extends SumType
