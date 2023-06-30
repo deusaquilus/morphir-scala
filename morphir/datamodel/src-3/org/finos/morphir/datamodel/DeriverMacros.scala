@@ -1,5 +1,7 @@
 package org.finos.morphir.datamodel
 
+import org.finos.morphir.datamodel.Deriver.UnionType
+
 import scala.quoted.*
 import scala.reflect.ClassTag
 
@@ -23,22 +25,37 @@ object DeriverMacros {
     TypeRepr.of[T].typeSymbol.flags
   }
 
+  inline def inferUnionType[T]: UnionType = ${ inferUnionTypeImpl[T] }
+  def inferUnionTypeImpl[T: Type](using Quotes): Expr[UnionType] = {
+    import quotes.reflect._
+    val flags = flagsOf[T]
+    if (flags.is(Flags.Sealed & Flags.Trait))
+      '{ UnionType.SealedTrait }
+    else if (flags.is(Flags.Enum))
+      '{ UnionType.Enum }
+    else report.errorAndAbort(
+      s"Type ${TypeRepr.of[T].show} is not a sealed trait or enum and Unions are not supported yet"
+    )
+  }
+
   inline def isEnum[T]: Boolean = ${ isEnumImpl[T] }
   def isEnumImpl[T: Type](using Quotes): Expr[Boolean] = {
     import quotes.reflect._
-    Expr(flagsOf[T].is(Flags.Sealed & Flags.Trait))
+    Expr(flagsOf[T].is(Flags.Enum))
   }
 
   inline def isSealedTrait[T]: Boolean = ${ isSealedTraitImpl[T] }
   def isSealedTraitImpl[T: Type](using Quotes): Expr[Boolean] = {
     import quotes.reflect._
-    Expr(flagsOf[T].is(Flags.Enum))
+    Expr(flagsOf[T].is(Flags.Sealed & Flags.Trait))
   }
 
   inline def isCaseClass[T]: Boolean = ${ isCaseClassImpl[T] }
   def isCaseClassImpl[T: Type](using Quotes): Expr[Boolean] = {
     import quotes.reflect._
-    Expr(flagsOf[T].is(Flags.Case))
+    val flags = flagsOf[T]
+    // for some reason case objects are considered case classes (or at least have a case flag so make sure it's not a module)
+    Expr(flags.is(Flags.Case) && !flags.is(Flags.Module))
   }
 
   inline def summonClassTagOrFail[T]: ClassTag[T] = ${ summonClassTagOrFailImpl[T] }
@@ -51,48 +68,64 @@ object DeriverMacros {
     }
   }
 
+  inline def showType[T]: String = ${ showTypeImpl[T] }
+  def showTypeImpl[T: Type](using Quotes): Expr[String] = {
+    import quotes.reflect._
+    Expr(TypeRepr.of[T].simplified.typeSymbol.name)
+  }
+
   inline def summonDeriver[T]: Deriver[T] = ${ summonDeriverImpl[T] }
   def summonDeriverImpl[T: Type](using Quotes): Expr[Deriver[T]] =
     import quotes.reflect._
-    // TODO Summoning generic sum deriver
+    def failNotProduct() =
+      report.errorAndAbort(
+        s"Cannot summon generic Deriver for the type (was not a Product): ${TypeRepr.of[T].widen.show} (flags: ${TypeRepr.of[T].typeSymbol.flags.show}). Have you imported org.finos.morphir.datamodel.Derivers.{given, _}"
+      )
+
     val specificDriver = Expr.summon[SpecificDeriver[T]]
     specificDriver match {
       case Some(value) => value
       case None =>
-        Type.of[T] match {
-          case '[IsProduct[p]] =>
-            val genericDeriver = Expr.summon[GenericProductDeriver[p]]
-            genericDeriver match {
-              case Some(value) => '{ $value.asInstanceOf[Deriver[T]] }
-              case _ =>
-                report.errorAndAbort(
-                  s"Cannot summon specific or generic Deriver for the type: ${TypeRepr.of[T].widen.show}"
-                )
-            }
-          case _ =>
-            report.errorAndAbort(
-              s"Cannot summon specific Deriver for the type (and it is not a Product): ${TypeRepr.of[T].widen.show}"
-            )
-        }
-
+        if (!TypeRepr.of[T].typeSymbol.flags.is(Flags.Module))
+          Type.of[T] match {
+            case '[IsProduct[p]] =>
+              val genericDeriver = Expr.summon[GenericProductDeriver[p]]
+              genericDeriver match {
+                case Some(value) => '{ $value.asInstanceOf[Deriver[T]] }
+                case _ =>
+                  report.errorAndAbort(
+                    s"Cannot summon specific or generic Deriver for the type: ${TypeRepr.of[T].widen.show}. Have you imported org.finos.morphir.datamodel.Derivers.{given, _}"
+                  )
+              }
+            case _ => failNotProduct()
+          }
+        else
+          failNotProduct()
     }
 
   inline def summonProductDeriver[T]: Deriver[T] = ${ summonProductDeriverImpl[T] }
   def summonProductDeriverImpl[T: Type](using Quotes): Expr[Deriver[T]] =
     import quotes.reflect._
-    Type.of[T] match {
-      case '[IsProduct[p]] =>
-        val genericDeriver = Expr.summon[GenericProductDeriver[p]]
-        genericDeriver match {
-          case Some(value) => '{ $value.asInstanceOf[Deriver[T]] }
-          case _ =>
-            report.errorAndAbort(
-              s"Cannot summon generic Deriver Product for the Product type: ${TypeRepr.of[T].widen.show}"
-            )
-        }
-      case _ =>
-        report.errorAndAbort(
-          s"Cannot summon generic Deriver for the type (was not a Product): ${TypeRepr.of[T].widen.show}"
-        )
-    }
+    def failNotProduct() =
+      report.errorAndAbort(
+        s"Cannot summon generic Deriver for the type (was not a Product): ${TypeRepr.of[T].widen.show} (flags: ${TypeRepr.of[T].typeSymbol.flags.show}). Have you imported org.finos.morphir.datamodel.Derivers.{given, _}"
+      )
+    // Not sure why but in Scala 3 case-objects are products. No idea why but we shouldn't be treating one of those
+    // as a product so if it's a case-object (i.e. Module) don't consider it to be a product
+    // (that's what the extra check is for!)
+    if (!TypeRepr.of[T].typeSymbol.flags.is(Flags.Module))
+      Type.of[T] match {
+        case '[IsProduct[p]] =>
+          val genericDeriver = Expr.summon[GenericProductDeriver[p]]
+          genericDeriver match {
+            case Some(value) => '{ $value.asInstanceOf[Deriver[T]] }
+            case _ =>
+              report.errorAndAbort(
+                s"Cannot summon generic Product-Deriver for the Product type: ${TypeRepr.of[T].widen.show} (flags: ${TypeRepr.of[T].typeSymbol.flags.show}). Have you imported org.finos.morphir.datamodel.Derivers.{given, _}"
+              )
+          }
+        case _ => failNotProduct()
+      }
+    else
+      failNotProduct()
 }
