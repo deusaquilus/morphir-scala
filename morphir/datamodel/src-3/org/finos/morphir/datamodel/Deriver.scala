@@ -140,8 +140,19 @@ object Deriver {
               .asInstanceOf[Deriver[T]] // not sure why the cast is needed
 
           case m: Mirror.SumOf[T] =>
-            m
-            ???
+            val sumTypeName = DeriverMacros.typeName[T]
+            val unionType =
+              if (isEnum[T]) UnionType.Enum
+              else if (isSealedTrait[T]) UnionType.SealedTrait
+              else error("Simple union types not allowed yet")
+
+            val variants = deriveSumVariants[m.MirroredElemLabels, m.MirroredElemTypes](unionType)
+            val builder =
+              unionType match {
+                case UnionType.Enum | UnionType.SealedTrait =>
+                  SumBuilder(SumBuilder.SumType.Enum(typeName), variants)
+              }
+            GenericSumDeriver.make[T](builder)
         }
     }
 }
@@ -152,21 +163,33 @@ trait GenericProductDeriver[T <: Product] extends Deriver[T] {
 }
 
 trait GenericSumDeriver[T] extends Deriver[T] {
-  def derive(value: T): Data = ??? // stage.rum(value)
-  def builder: SumBuilder    = ???
+  def derive(value: T): Data =
+    builder.run(value)
+  def deriveWithTag(value: T)(implicit ct: ClassTag[T]): Data =
+    builder.run(value, Some(ct.asInstanceOf[ClassTag[Any]]))
+  def builder: SumBuilder
+}
+object GenericSumDeriver {
+  def make[T](sumBuilder: SumBuilder) =
+    new GenericSumDeriver[T] {
+      val builder = sumBuilder
+      val concept = ???
+    }
 }
 
 object GenericProductDeriver {
-  def make[T <: Product](creationStage: ProductBuilder.MirrorProduct) =
+  def make[T <: Product](productBuilder: ProductBuilder.MirrorProduct) =
     new GenericProductDeriver[T] {
-      val builder = creationStage
+      val builder = productBuilder
       val concept: Concept.Record = {
         // Deriver stage contains list of fields and child derivers
         val fields: List[(Label, Concept)] =
-          creationStage.fields.map {
+          productBuilder.fields.map {
             case ProductBuilder.Leaf(field, _, deriver) =>
               (Label(field), deriver.concept)
             case ProductBuilder.Product(field, _, deriver) =>
+              (Label(field), deriver.concept)
+            case ProductBuilder.Sum(field, index, deriver) =>
               (Label(field), deriver.concept)
           }
         Concept.Record(fields)

@@ -58,15 +58,29 @@ private[datamodel] case class SumBuilder(tpe: SumBuilder.SumType, variants: List
       s"Inner enum data (for: ${tpe}) is only allowed to come from a Scala product but it was derived as: $derivedAs"
     )
 
-  def run(value: Any, tag: ClassTag[Any]): Data = {
+  def run(value: Any, tag: Option[ClassTag[Any]] = None): Data = {
     val usedVariant =
-      variants.find(v => tag <:< v.tag) match {
-        case Some(value) => value
+      tag match {
+        case Some(tag) =>
+          variants.find(v => tag <:< v.tag) match {
+            case Some(value) => value
+            case None =>
+              val varNames = variants.map(v => s"${v.enumLabel}:${v.tag.runtimeClass.getName}")
+              throw new IllegalArgumentException(
+                s"Cannot decode instance of ${tag.runtimeClass.getName} (value was ${value}:${value.getClass.getSimpleName}) becase it was not any of the possibilities: ${varNames}"
+              )
+          }
+        // If we don't have a class-tag need to rely on JVM-level reflection (not sure this is implemented in ScalaJS)
         case None =>
-          val varNames = variants.map(v => s"${v.enumLabel}:${v.tag.runtimeClass.getName}")
-          throw new IllegalArgumentException(
-            s"Cannot decode instance of ${tag.runtimeClass.getName} (value was ${value}:${value.getClass.getSimpleName}) becase it was not any of the possibilities: ${varNames}"
-          )
+          val cls = value.getClass
+          variants.find(v => cls.isAssignableFrom(v.tag.runtimeClass)) match {
+            case Some(value) => value
+            case None =>
+              val varNames = variants.map(v => s"${v.enumLabel}:${v.tag.runtimeClass.getName}")
+              throw new IllegalArgumentException(
+                s"Cannot decode instance of ${value}:${cls.getName} because it was not a sub-type of any of the possibilities: ${varNames}"
+              )
+          }
       }
 
     val enumValues =
@@ -94,7 +108,7 @@ private[datamodel] case class SumBuilder(tpe: SumBuilder.SumType, variants: List
     // TODO what if it's a singleton e.g. a case-object, maybe need another SumBuilder type for that
     val (enumType, enumLabel) =
       tpe match {
-        case SumBuilder.Enum(name) =>
+        case SumBuilder.SumType.Enum(name) =>
           val enumCases =
             variants.map { v =>
               val enumVariantFields =
@@ -133,6 +147,8 @@ object SumBuilder {
   case class SumVariant(enumLabel: java.lang.String, tag: ClassTag[Any], deriver: Deriver[Any]) extends Variant
 
   sealed trait SumType
-  case class Enum(name: java.lang.String) extends SumType
-  // TODO Union for non-discrimited unions
+  object SumType {
+    case class Enum(name: java.lang.String) extends SumType
+    // TODO Union for non-discrimited unions
+  }
 }

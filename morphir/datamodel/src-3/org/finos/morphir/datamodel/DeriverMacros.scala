@@ -6,6 +6,12 @@ import scala.reflect.ClassTag
 object DeriverMacros {
   import DeriverTypes._
 
+  inline def typeName[T]: String = ${ typeNameImpl[T] }
+  def typeNameImpl[T: Type](using Quotes): Expr[String] = {
+    import quotes.reflect._
+    Expr(TypeRepr.of[T].typeSymbol.name)
+  }
+
   inline def showFlags[T]: String = ${ showFlagsImpl[T] }
   def showFlagsImpl[T: Type](using Quotes): Expr[String] = {
     import quotes.reflect._
