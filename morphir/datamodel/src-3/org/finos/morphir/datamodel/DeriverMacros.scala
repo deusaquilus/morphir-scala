@@ -41,13 +41,33 @@ object DeriverMacros {
   inline def isEnum[T]: Boolean = ${ isEnumImpl[T] }
   def isEnumImpl[T: Type](using Quotes): Expr[Boolean] = {
     import quotes.reflect._
-    Expr(flagsOf[T].is(Flags.Enum))
+    Expr(flagsOf[T].is(Flags.Enum) && !(TypeRepr.of[T] <:< TypeRepr.of[List[Any]]))
+  }
+
+  inline def isEnumOrSealedTrait[T]: Boolean = ${ isEnumOrSealedTraitImpl[T] }
+  def isEnumOrSealedTraitImpl[T: Type](using Quotes): Expr[Boolean] = {
+    import quotes.reflect._
+    val isEnum        = flagsOf[T].is(Flags.Enum)
+    val isSealedTrait = flagsOf[T].is(Flags.Sealed) && flagsOf[T].is(Flags.Trait)
+    val result        = (isEnum || isSealedTrait) && !(TypeRepr.of[T] <:< TypeRepr.of[List[Any]])
+    Expr(result)
   }
 
   inline def isSealedTrait[T]: Boolean = ${ isSealedTraitImpl[T] }
   def isSealedTraitImpl[T: Type](using Quotes): Expr[Boolean] = {
     import quotes.reflect._
-    Expr(flagsOf[T].is(Flags.Sealed & Flags.Trait))
+    Expr(flagsOf[T].is(Flags.Sealed & Flags.Trait) && !(TypeRepr.of[T] <:< TypeRepr.of[List[Any]]))
+  }
+
+  inline def errorOnType[T](msg: String): Nothing = ${ errorOnType[T]('msg) }
+  def errorOnType[T: Type](msg: Expr[String])(using Quotes): Expr[Nothing] = {
+    import quotes.reflect._
+    val msgConst =
+      msg match {
+        case Expr(str: String) => str
+        case _                 => report.errorAndAbort(s"Error-on-type has a non-constant value: ${msg.show}")
+      }
+    report.errorAndAbort(s"$msgConst: ${TypeRepr.of[T].widen.show}")
   }
 
   inline def isCaseClass[T]: Boolean = ${ isCaseClassImpl[T] }
@@ -55,7 +75,8 @@ object DeriverMacros {
     import quotes.reflect._
     val flags = flagsOf[T]
     // for some reason case objects are considered case classes (or at least have a case flag so make sure it's not a module)
-    Expr(flags.is(Flags.Case) && !flags.is(Flags.Module))
+    // also, for some reason in Scala 3, the List.:: instance is actually a case class!
+    Expr(flags.is(Flags.Case) && !flags.is(Flags.Module) && !(TypeRepr.of[T] <:< TypeRepr.of[List[Any]]))
   }
 
   inline def summonClassTagOrFail[T]: ClassTag[T] = ${ summonClassTagOrFailImpl[T] }
@@ -121,7 +142,7 @@ object DeriverMacros {
             case Some(value) => '{ $value.asInstanceOf[Deriver[T]] }
             case _ =>
               report.errorAndAbort(
-                s"Cannot summon generic Product-Deriver for the Product type: ${TypeRepr.of[T].widen.show} (flags: ${TypeRepr.of[T].typeSymbol.flags.show}). Have you imported org.finos.morphir.datamodel.Derivers.{given, _}"
+                s"Cannot summon generic Product-Deriver for the Product type: ${TypeRepr.of[T].simplified.widen.show} (flags: ${TypeRepr.of[T].typeSymbol.flags.show}). Have you imported org.finos.morphir.datamodel.Derivers.{given, _}"
               )
           }
         case _ => failNotProduct()

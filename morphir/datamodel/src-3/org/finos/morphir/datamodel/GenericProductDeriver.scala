@@ -2,12 +2,13 @@ package org.finos.morphir.datamodel
 
 import scala.reflect.ClassTag
 import scala.reflect.classTag
-import scala.quoted._
-import scala.deriving._
-import scala.compiletime.{erasedValue, constValue, summonFrom, summonInline, error, codeOf}
+import scala.quoted.*
+import scala.deriving.*
+import scala.compiletime.{codeOf, constValue, erasedValue, error, summonFrom, summonInline}
 import org.finos.morphir.datamodel.Data
 import org.finos.morphir.datamodel.Label
 import org.finos.morphir.datamodel.Concept
+import org.finos.morphir.datamodel.DeriverMacros.{errorOnType, isCaseClass}
 
 trait GenericProductDeriver[T <: Product] extends Deriver[T] {
   def derive(value: T): Data = builder.run(value)
@@ -15,7 +16,7 @@ trait GenericProductDeriver[T <: Product] extends Deriver[T] {
 }
 
 object GenericProductDeriver {
-  def make[T <: Product](productBuilder: ProductBuilder.MirrorProduct) =
+  def make[T <: Product](productBuilder: ProductBuilder.MirrorProduct): GenericProductDeriver[T] =
     new GenericProductDeriver[T] {
       val builder = productBuilder
       val concept: Concept.Record = {
@@ -46,13 +47,5 @@ object GenericProductDeriver {
    * }}
    */
   inline def gen[T <: Product]: GenericProductDeriver[T] =
-    summonFrom { case ev: Mirror.Of[T] =>
-      inline ev match {
-        case m: Mirror.ProductOf[T] =>
-          val stageListTuple = Deriver.deriveProductFields[m.MirroredElemLabels, m.MirroredElemTypes](0)
-          val mirrorProduct  = ProductBuilder.MirrorProduct(stageListTuple)
-          GenericProductDeriver
-            .make[T & Product](mirrorProduct)
-      }
-    }
+    summonFrom { case m: Mirror.ProductOf[T] => Deriver.deriveProductFromMirror[T](m) }
 }

@@ -1,10 +1,12 @@
 package org.finos.morphir.datamodel
 
+import org.finos.morphir.datamodel
+
 import scala.reflect.ClassTag
 import scala.reflect.classTag
-import scala.quoted._
-import scala.deriving._
-import scala.compiletime.{erasedValue, constValue, summonFrom, summonInline, error, codeOf}
+import scala.quoted.*
+import scala.deriving.*
+import scala.compiletime.{codeOf, constValue, erasedValue, error, summonFrom, summonInline}
 import org.finos.morphir.datamodel.Data
 import org.finos.morphir.datamodel.Label
 import org.finos.morphir.datamodel.Concept
@@ -13,8 +15,6 @@ trait Deriver[T] {
   def derive(value: T): Data
   def concept: Concept
 }
-
-
 
 trait SpecificDeriver[T] extends Deriver[T] {
   def derive(value: T): Data
@@ -117,6 +117,40 @@ object Deriver {
         }
     }
 
+  inline def deriveProductFromMirror[T](m: Mirror.ProductOf[T]): GenericProductDeriver[T & Product] =
+    inline if (isCaseClass[T]) {
+      val stageListTuple = deriveProductFields[m.MirroredElemLabels, m.MirroredElemTypes](0)
+      val mirrorProduct  = ProductBuilder.MirrorProduct(stageListTuple)
+      GenericProductDeriver
+        .make[T & Product](mirrorProduct)
+    } else {
+      errorOnType[T]("Cannot summon a generic deriver of he case class type. It is not a valid product type")
+    }
+
+  inline def deriveSumFromMirror[T](m: Mirror.SumOf[T]): GenericSumDeriver[T] =
+    inline if (isEnumOrSealedTrait[T]) {
+      val sumTypeName = DeriverMacros.typeName[T]
+      // The clause `inferUnionType` NEEDs to be  a macro otherwise we can't get the value
+      // coming out if it to work with inline matches/ifs and if our matches/ifs are not inline
+      // and there is a `scala.compiletime.error` command called of a non-inline match/if branch
+      // called then it will happen no mater what the input data is because these constructs
+      // just do the equivalent of report.errorAndAbort for all inputs. The only way to NOT
+      // activate them is to have them on a branch of a inline match/if which is not being called
+      val variants =
+        deriveSumVariants[m.MirroredElemLabels, m.MirroredElemTypes](inferUnionType[T])
+
+      val builder =
+        inline inferUnionType[T] match {
+          case UnionType.Enum | UnionType.SealedTrait =>
+            SumBuilder(SumBuilder.SumType.Enum(sumTypeName), variants)
+          case UnionType.Sum =>
+            error("Simple union types not allowed yet in builder synthesis")
+        }
+      GenericSumDeriver.make[T](builder)
+    } else {
+      errorOnType[T]("The following type is not a valid enum and there is no specific deriver defined for it")
+    }
+
   // TODO When making a product deriver, make sure to exclude Option[T] since
   //      we want a specific deriver for that, not a generic one.
   inline def gen[T]: Deriver[T] =
@@ -129,35 +163,14 @@ object Deriver {
         inline ev match {
           case m: Mirror.ProductOf[IsOption[t]] =>
             error(
-              "Cannot summon a generic derivation of Option[T], a specific encoder is required. Have you imported `org.finos.morphir.datamodel.Derviers._` ?"
+              s"Cannot summon a generic derivation of Option[T], a specific encoder is required."
             )
 
           case m: Mirror.ProductOf[T] =>
-            val stageListTuple = deriveProductFields[m.MirroredElemLabels, m.MirroredElemTypes](0)
-            val mirrorProduct  = ProductBuilder.MirrorProduct(stageListTuple)
-            GenericProductDeriver
-              .make[T & Product](mirrorProduct)
-              .asInstanceOf[Deriver[T]] // not sure why the cast is needed
-
+            // cast is needed otherwise it's T & Product which doesn't seem to derive correctly
+            deriveProductFromMirror[T](m).asInstanceOf[Deriver[T]]
           case m: Mirror.SumOf[T] =>
-            val sumTypeName = DeriverMacros.typeName[T]
-            // The clause `inferUnionType` NEEDs to be  a macro otherwise we can't get the value
-            // coming out if it to work with inline matches/ifs and if our matches/ifs are not inline
-            // and there is a `scala.compiletime.error` command called of a non-inline match/if branch
-            // called then it will happen no mater what the input data is because these constructs
-            // just do the equivalent of report.errorAndAbort for all inputs. The only way to NOT
-            // activate them is to have them on a branch of a inline match/if which is not being called
-            val variants =
-              deriveSumVariants[m.MirroredElemLabels, m.MirroredElemTypes](inferUnionType[T])
-
-            val builder =
-              inline inferUnionType[T] match {
-                case UnionType.Enum | UnionType.SealedTrait =>
-                  SumBuilder(SumBuilder.SumType.Enum(typeName), variants)
-                case UnionType.Sum =>
-                  error("Simple union types not allowed yet in builder synthesis")
-              }
-            GenericSumDeriver.make[T](builder)
+            deriveSumFromMirror[T](m)
         }
     }
 }

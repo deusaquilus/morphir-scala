@@ -5,7 +5,7 @@ import org.finos.morphir.datamodel.Util._
 
 class ToDataRecords extends munit.FunSuite {
   test("basic record") {
-    case class Person(name: String, age: Int) //////
+    case class Person(name: String, age: Int) ////////
     assertEquals(
       Deriver.toData(Person("Joe", 123)), //
       Data.Record(l"name" -> Data.String("Joe"), l"age" -> Data.Int(123))

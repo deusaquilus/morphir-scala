@@ -123,9 +123,15 @@ object Concept {
   case class Enum(name: java.lang.String, cases: scala.List[Enum.Case]) extends Concept
 
   object Enum {
+    def apply(name: java.lang.String, cases: Enum.Case*) =
+      new Enum(name, cases.toList)
+
     case class Case(label: Label, fields: scala.List[Case.Field])
 
     object Case {
+      def apply(label: Label, fields: Case.Field*) =
+        new Case(label, fields.toList)
+
       sealed trait Field
 
       object Field {

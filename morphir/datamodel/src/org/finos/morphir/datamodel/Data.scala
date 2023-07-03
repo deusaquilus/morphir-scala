@@ -39,6 +39,11 @@ object Data {
       shape: Concept.Enum
   ) extends Data
 
+  object Case {
+    def apply(value: Data, values: Data*)(enumLabel: java.lang.String, shape: Concept.Enum) =
+      new Case((value +: values).toList, enumLabel, shape)
+  }
+
   case class Tuple(values: scala.List[Data]) extends Data {
     val shape: Concept.Tuple = Concept.Tuple(values.map(_.shape))
   }
