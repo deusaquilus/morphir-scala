@@ -34,14 +34,14 @@ object Data {
    * See notes on Concept.Enum for information on how this type is modelled
    */
   case class Case(
-      value: scala.List[Data],
+      values: scala.List[(EnumLabel, Data)],
       enumLabel: java.lang.String,
       shape: Concept.Enum
   ) extends Data
 
   object Case {
-    def apply(value: Data, values: Data*)(enumLabel: java.lang.String, shape: Concept.Enum) =
-      new Case((value +: values).toList, enumLabel, shape)
+    def apply(values: (EnumLabel, Data)*)(enumLabel: java.lang.String, shape: Concept.Enum) =
+      new Case(values.toList, enumLabel, shape)
   }
 
   case class Tuple(values: scala.List[Data]) extends Data {

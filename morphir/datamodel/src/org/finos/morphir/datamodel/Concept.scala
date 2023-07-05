@@ -126,19 +126,11 @@ object Concept {
     def apply(name: java.lang.String, cases: Enum.Case*) =
       new Enum(name, cases.toList)
 
-    case class Case(label: Label, fields: scala.List[Case.Field])
+    case class Case(label: Label, fields: scala.List[(EnumLabel, Concept)])
 
     object Case {
-      def apply(label: Label, fields: Case.Field*) =
+      def apply(label: Label, fields: (EnumLabel, Concept)*) =
         new Case(label, fields.toList)
-
-      sealed trait Field
-
-      object Field {
-        case class Named(label: Label, value: Concept) extends Field
-
-        case class Anon(value: Concept) extends Field
-      }
     }
   }
 

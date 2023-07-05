@@ -22,7 +22,7 @@ private[datamodel] case class SumBuilder(tpe: SumBuilder.SumType, variants: List
                 val enumVariantFields =
                   variant.deriver.concept match {
                     case Concept.Record(fields) =>
-                      fields.map { case (label, concept) => Concept.Enum.Case.Field.Named(label, concept) }
+                      fields.map { case (label, concept) => (EnumLabel(label.value), concept) }
                     case other =>
                       failInsideNotProduct(other)
                   }
@@ -62,7 +62,7 @@ private[datamodel] case class SumBuilder(tpe: SumBuilder.SumType, variants: List
       usedVariant match {
         // for a enum case object, data-type is just a 'unit'
         case SumBuilder.EnumSingleton(enumLabel, tag) =>
-          List(Data.Unit)
+          List()
 
         case v: SumBuilder.EnumProduct =>
           value match {
@@ -70,7 +70,7 @@ private[datamodel] case class SumBuilder(tpe: SumBuilder.SumType, variants: List
               val enumCaseRecord = v.deriver.derive(p)
               enumCaseRecord match {
                 case Data.Record(values) =>
-                  values.map { (_, data) => data }
+                  values.map { case (label, data) => (EnumLabel(label.value), data) }
                 case other =>
                   failInsideNotProduct(other)
               }

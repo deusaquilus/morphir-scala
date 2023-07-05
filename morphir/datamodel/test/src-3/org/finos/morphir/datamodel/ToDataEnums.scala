@@ -32,7 +32,7 @@ class ToDataEnums extends munit.FunSuite {
     Enum(
       "Foo",
       Enum.Case(l"Bar"),
-      Enum.Case(l"Baz", Enum.Case.Field.Named(l"value", Concept.String))
+      Enum.Case(l"Baz", (el"value", Concept.String))
     )
 
   test("Enum Data 1 - Concept") {
@@ -42,27 +42,27 @@ class ToDataEnums extends munit.FunSuite {
 
   test("Enum Data 1 - NoVals") {
     import EnumData1._
-    assertEquals(deriver.derive(Bar), Case(Data.Unit)("Bar", concept))
+    assertEquals(deriver.derive(Bar), Case(List(), "Bar", concept))
   }
 
   test("Enum Data 1 - Value") {
     import EnumData1._
     assertEquals(
       deriver.derive(Baz("something")),
-      Case(Data.String("something"))("Baz", concept)
+      Case(el"value" -> Data.String("something"))("Baz", concept)
     )
   }
 
-  test("Enum Data 1 - Adv") { //
+  test("Enum Data 1 - Adv") {
     import EnumData1._
     val listOfEnums = List(Bar, Baz("A"), Baz("B"))
     println("hello")
     assertEquals(
-      Deriver.toData(listOfEnums), //////// hellohello // // //// //////
+      Deriver.toData(listOfEnums),
       Data.List(
-        Case(Data.Unit)("Bar", concept),
-        Case(Data.String("A"))("Baz", concept),
-        Case(Data.String("B"))("Baz", concept)
+        Case()("Bar", concept),
+        Case(el"value" -> Data.String("A"))("Baz", concept),
+        Case(el"value" -> Data.String("B"))("Baz", concept)
       )
     )
   }
@@ -74,14 +74,14 @@ class ToDataEnums extends munit.FunSuite {
 
   test("Enum Data 2 - NoVals") {
     import EnumData1._
-    assertEquals(deriver.derive(Bar), Case(Data.Unit)("Bar", concept))
+    assertEquals(deriver.derive(Bar), Case(List(), "Bar", concept))
   }
 
   test("Enum Data 2 - Value") {
     import EnumData1._
     assertEquals(
       deriver.derive(Baz("something")),
-      Case(Data.String("something"))("Baz", concept)
+      Case(el"value" -> Data.String("something"))("Baz", concept)
     )
   }
 }
