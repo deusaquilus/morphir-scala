@@ -441,9 +441,19 @@ object Native {
       handleSameNumerics(a, b) { (a, b, helper) => helper.lt(a, b) }
     }
 
+  val lessThanOrEqual: SDKValue[Unit, Type.UType] =
+    SDKValue.SDKNativeFunction.fun2 { (a: Result[Unit, Type.UType], b: Result[Unit, Type.UType]) =>
+      handleSameNumerics(a, b) { (a, b, helper) => helper.lteq(a, b) }
+    }
+
   val greaterThan: SDKValue[Unit, Type.UType] =
     SDKValue.SDKNativeFunction.fun2 { (a: Result[Unit, Type.UType], b: Result[Unit, Type.UType]) =>
       handleSameNumerics(a, b) { (a, b, helper) => helper.gt(a, b) }
+    }
+
+  val greaterThanOrEqual: SDKValue[Unit, Type.UType] =
+    SDKValue.SDKNativeFunction.fun2 { (a: Result[Unit, Type.UType], b: Result[Unit, Type.UType]) =>
+      handleSameNumerics(a, b) { (a, b, helper) => helper.gteq(a, b) }
     }
 
   val equal: SDKValue[Unit, Type.UType] = SDKValue.SDKNativeFunction.fun2 {
@@ -548,6 +558,8 @@ object Native {
     FQName.fromString("Morphir.SDK:Basics:logBase")             -> log,
     FQName.fromString("Morphir.SDK:Basics:lessThan")            -> lessThan,
     FQName.fromString("Morphir.SDK:Basics:greaterThan")         -> greaterThan,
+    FQName.fromString("Morphir.SDK:Basics:lessThanOrEqual")     -> lessThanOrEqual,
+    FQName.fromString("Morphir.SDK:Basics:greaterThanOrEqual")  -> greaterThanOrEqual,
     FQName.fromString("Morphir.SDK:List:concat")                -> concat,
     FQName.fromString("Morphir.SDK:List:singleton")             -> singleton,
     FQName.fromString("Morphir.SDK:List:isEmpty")               -> isEmpty,
