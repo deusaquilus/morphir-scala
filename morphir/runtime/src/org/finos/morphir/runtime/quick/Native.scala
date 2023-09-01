@@ -141,6 +141,48 @@ object DictSDK {
 }
 
 object ListSDK {
+  val any: SDKValue[Unit, Type.UType] = SDKValue.SDKNativeInnerFunction {
+    NativeFunctionSignatureAdv.Fun2 {
+      // === ELM ===
+      // -- NOTE: This is equivalent of Scala's List.exists function
+      // any : (a -> Bool) -> List a -> Bool
+      // any isOkay list =
+      //   case list of
+      //     [] -> False
+      //     x :: xs -> if isOkay x then True else any isOkay xs
+      (evaluator: Loop[Unit, Type.UType]) => (isOkay: Result[Unit, Type.UType], listRaw: Result[Unit, Type.UType]) =>
+        {
+          val list = listRaw.unwrapList
+          val output =
+            list.exists(elem =>
+              evaluator.handleApplyResult(Type.UType.Unit(()), isOkay, elem).unwrapBoolean
+            )
+          Result.Primitive.Boolean(output)
+        }
+    }
+  }
+
+  val partition: SDKValue[Unit, Type.UType] = SDKValue.SDKNativeInnerFunction {
+    NativeFunctionSignatureAdv.Fun2 {
+      // === ELM ===
+      // -- The signature of the ELM function is this. This is equivalent of Scala's List.partition
+      // partition : (a -> Bool) -> List a -> (List a, List a)
+      // partition pred list = ...
+      (evaluator: Loop[Unit, Type.UType]) => (pred: Result[Unit, Type.UType], listRaw: Result[Unit, Type.UType]) =>
+        {
+          val list = listRaw.unwrapList
+          val (left, right) =
+            list.partition(elem =>
+              evaluator.handleApplyResult(Type.UType.Unit(()), pred, elem).unwrapBoolean
+            )
+          Result.Tuple[Unit, Type.UType](
+            Result.ListResult[Unit, Type.UType](left),
+            Result.ListResult[Unit, Type.UType](right)
+          )
+        }
+    }
+  }
+
   val foldl: SDKValue[Unit, Type.UType] = SDKValue.SDKNativeInnerFunction {
     NativeFunctionSignatureAdv.Fun3 {
       (evaluator: Loop[Unit, Type.UType]) =>
@@ -170,10 +212,12 @@ object ListSDK {
       Result.Primitive.Boolean(listA.size == 0)
     }
   val sdk: Map[FQName, SDKValue[Unit, Type.UType]] = Map(
-    FQName.fromString("Morphir.SDK:List:foldl")   -> foldl,
-    FQName.fromString("Morphir.SDK:List:append")  -> append,
-    FQName.fromString("Morphir.SDK:List:cons")    -> cons,
-    FQName.fromString("Morphir.SDK:List:isEmpty") -> isEmpty
+    FQName.fromString("Morphir.SDK:List:foldl")     -> foldl,
+    FQName.fromString("Morphir.SDK:List:append")    -> append,
+    FQName.fromString("Morphir.SDK:List:cons")      -> cons,
+    FQName.fromString("Morphir.SDK:List:isEmpty")   -> isEmpty,
+    FQName.fromString("Morphir.SDK:List:any")       -> any,
+    FQName.fromString("Morphir.SDK:List:partition") -> partition
   )
 }
 

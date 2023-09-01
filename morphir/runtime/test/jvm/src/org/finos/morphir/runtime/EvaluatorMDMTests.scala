@@ -417,6 +417,18 @@ object EvaluatorMDMTests extends MorphirBaseSpec {
             Data.String("bazzz") -> Data.Int(5)
           )
         ),
+        testEvaluation("List.any with True Output")("listTests", "listAnyTrueTest")(
+          Data.Boolean(true)
+        ),
+        testEvaluation("List.any with True Output")("listTests", "listAnyFalseTest")(
+          Data.Boolean(false)
+        ),
+        testEvaluation("List Parittion")("listTests", "listPartitionTest")(
+          Data.Tuple(
+            Data.List(Data.Int(1), Data.Int(3), Data.Int(5)),
+            Data.List(Data.Int(2), Data.Int(4))
+          )
+        ),
         testEvalMultiple("Append (and infer type")(
           "ListTests",
           "listAppend",
